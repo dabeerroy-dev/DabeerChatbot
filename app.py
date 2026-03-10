@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-import google.generativeai as genai
+from groq import Groq
 import PyPDF2
 import docx
 
@@ -24,12 +24,12 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""<div class="chat-header"><h1>🤝 CorpAssist Pro — Dataset Chatbot</h1><p>Upload your dataset · Ask questions in plain English · Powered by Google Gemini (Free) · 90% Precision · 85% Accuracy</p></div>""", unsafe_allow_html=True)
+st.markdown("""<div class="chat-header"><h1>🤝 CorpAssist Pro — Dataset Chatbot</h1><p>Upload your dataset · Ask questions in plain English · Powered by Groq AI (Free) · 90% Precision · 85% Accuracy</p></div>""", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("## ⚙️ Configuration")
-    api_key = st.text_input("🔑 Google Gemini API Key", type="password", placeholder="AIza...", help="Free at aistudio.google.com")
-    st.caption("🆓 Get free key at [aistudio.google.com](https://aistudio.google.com)")
+    api_key = st.text_input("🔑 Groq API Key", type="password", placeholder="gsk_...", help="Free at console.groq.com")
+    st.caption("🆓 Get free key at [console.groq.com](https://console.groq.com) — No card needed!")
     st.divider()
     st.markdown("## 📂 Upload Dataset")
     uploaded_file = st.file_uploader("Choose a file", type=["csv","xlsx","xls","json","txt","pdf","docx"])
@@ -84,9 +84,9 @@ if uploaded_file:
             st.dataframe(df_preview.head(10), use_container_width=True)
 
 RULES = {
-    ("hello","hi","hey","greetings"): "Hello! 👋 Welcome to CorpAssist Pro. Upload your dataset and ask me anything about it!",
-    ("what can you do","capabilities","help","features"): "I can:\n\n📊 **Analyze datasets** — CSV, Excel, JSON, PDF, Word\n🔍 **Answer data queries** — stats, rows, summaries\n💼 **Business assistance** — reports, summaries\n🤖 **General chat** — powered by Google Gemini (free!)",
-    ("precision","accuracy","performance"): "📊 **90% Precision** · ✅ **85% Accuracy** — powered by Gemini AI + Rule Engine hybrid.",
+    ("hello","hi","hey","greetings"): "Hello! 👋 Welcome to CorpAssist Pro. Upload your dataset and ask me anything!",
+    ("what can you do","capabilities","help","features"): "I can:\n\n📊 **Analyze datasets** — CSV, Excel, JSON, PDF, Word\n🔍 **Answer data queries** — stats, rows, summaries\n💼 **Business assistance** — reports, summaries\n🤖 **General chat** — powered by Groq AI (free!)",
+    ("precision","accuracy","performance"): "📊 **90% Precision** · ✅ **85% Accuracy**",
     ("thank","thanks","thank you"): "You're welcome! 😊",
     ("bye","goodbye"): "Goodbye! 👋",
 }
@@ -98,18 +98,24 @@ def match_rule(text):
             return response
     return None
 
-def ask_gemini(user_message, history, dataset_ctx="", api_key=""):
-    genai.configure(api_key=api_key)
+def ask_groq(user_message, history, dataset_ctx="", api_key=""):
+    client = Groq(api_key=api_key)
     system = f"""You are CorpAssist Pro, a professional AI assistant for dataset analysis and business help.
 Be precise, concise and data-driven. Use markdown formatting when helpful.
 {"--- DATASET ---\n" + dataset_ctx[:6000] + "\n--- END ---" if dataset_ctx else ""}"""
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash", system_instruction=system)
-    gemini_history = []
+    
+    messages = [{"role": "system", "content": system}]
     for m in history[-12:]:
-        role = "user" if m["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [m["content"]]})
-    chat = model.start_chat(history=gemini_history[:-1] if len(gemini_history) > 1 else [])
-    return chat.send_message(user_message).text
+        if m["role"] in ("user", "assistant"):
+            messages.append({"role": m["role"], "content": m["content"]})
+    messages.append({"role": "user", "content": user_message})
+    
+    response = client.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=messages,
+        max_tokens=1000
+    )
+    return response.choices[0].message.content
 
 st.markdown("**⚡ Quick Actions:**")
 qcols = st.columns(5)
@@ -120,7 +126,7 @@ for i,(label,q) in enumerate(quick_qs):
             st.session_state["quick_input"] = q
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role":"assistant","content":"👋 Welcome to **CorpAssist Pro**!\n\nPowered by **Google Gemini (Free)** 🆓\n\nUpload a dataset on the left sidebar and ask me anything!\n\n**Supported:** CSV, Excel, JSON, PDF, TXT, DOCX","source":"rule"}]
+    st.session_state.messages = [{"role":"assistant","content":"👋 Welcome to **CorpAssist Pro**!\n\nPowered by **Groq AI (100% Free, No Card)** 🆓\n\nUpload a dataset on the left and ask me anything!\n\n**Supported:** CSV, Excel, JSON, PDF, TXT, DOCX","source":"rule"}]
 
 for msg in st.session_state.messages:
     role = msg["role"]
@@ -128,7 +134,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if role == "assistant":
             src = msg.get("source","ai")
-            badge = "⚙️ Rule Engine" if src=="rule" else "✨ Gemini AI"
+            badge = "⚙️ Rule Engine" if src=="rule" else "✨ Groq AI"
             css = "source-badge-rule" if src=="rule" else "source-badge-ai"
             st.markdown(f'<span class="{css}">{badge}</span>', unsafe_allow_html=True)
 
@@ -143,7 +149,7 @@ if user_input:
         st.markdown(user_input)
     with st.chat_message("assistant", avatar="🤝"):
         rule_reply = match_rule(user_input)
-        data_kw = ["data","dataset","csv","column","row","file","summarize","statistics","average","mean","max","min","count","show","top","bottom","excel","upload","analyze","analysis","value","record","insight"]
+        data_kw = ["data","dataset","csv","column","row","file","summarize","statistics","average","mean","max","min","count","show","top","bottom","excel","upload","analyze","analysis","value","record","insight","pdf","report"]
         needs_data = any(k in user_input.lower() for k in data_kw)
         if rule_reply and not needs_data:
             st.markdown(rule_reply)
@@ -151,19 +157,19 @@ if user_input:
             st.session_state.messages.append({"role":"assistant","content":rule_reply,"source":"rule"})
         else:
             if not api_key:
-                reply = "⚠️ Please enter your **Google Gemini API Key** in the sidebar.\n\n👉 Get it **free** (no card) at [aistudio.google.com](https://aistudio.google.com)"
+                reply = "⚠️ Please enter your **Groq API Key** in the sidebar.\n\n👉 Get it **FREE** (no card!) at [console.groq.com](https://console.groq.com)"
                 src = "rule"
             else:
                 with st.spinner("🤖 Thinking..."):
                     try:
                         history = [m for m in st.session_state.messages if m["role"] in ("user","assistant")]
-                        reply = ask_gemini(user_input, history[:-1], dataset_context, api_key)
+                        reply = ask_groq(user_input, history[:-1], dataset_context, api_key)
                         src = "ai"
                     except Exception as e:
-                        reply = f"❌ Error: `{e}`\n\nPlease check your Gemini API key."
+                        reply = f"❌ Error: `{e}`\n\nPlease check your Groq API key."
                         src = "rule"
             st.markdown(reply)
-            badge = "⚙️ Rule Engine" if src=="rule" else "✨ Gemini AI"
+            badge = "⚙️ Rule Engine" if src=="rule" else "✨ Groq AI"
             css = "source-badge-rule" if src=="rule" else "source-badge-ai"
             st.markdown(f'<span class="{css}">{badge}</span>', unsafe_allow_html=True)
             st.session_state.messages.append({"role":"assistant","content":reply,"source":src})
