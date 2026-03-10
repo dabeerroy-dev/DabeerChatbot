@@ -103,7 +103,7 @@ def ask_gemini(user_message, history, dataset_ctx="", api_key=""):
     system = f"""You are CorpAssist Pro, a professional AI assistant for dataset analysis and business help.
 Be precise, concise and data-driven. Use markdown formatting when helpful.
 {"--- DATASET ---\n" + dataset_ctx[:6000] + "\n--- END ---" if dataset_ctx else ""}"""
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=system)
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash", system_instruction=system)
     gemini_history = []
     for m in history[-12:]:
         role = "user" if m["role"] == "user" else "model"
