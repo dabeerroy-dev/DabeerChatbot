@@ -111,7 +111,7 @@ Be precise, concise and data-driven. Use markdown formatting when helpful.
     messages.append({"role": "user", "content": user_message})
     
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         messages=messages,
         max_tokens=1000
     )
